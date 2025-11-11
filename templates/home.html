@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Job Hunter{% endblock %}
+
+{% block content %}
+<div id="loading" class="loading">
+    Loading statistics...
+</div>
+
+<div id="stats-container" style="display: none;">
+    <button class="refresh-btn" onclick="loadStats()">🔄 Refresh Stats</button>
+    
+    <h2 style="margin-bottom: 20px; color: #495057;">📊 Overview</h2>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Total Jobs</h3>
+            <div class="number" id="total-jobs">0</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3>New in Last Hour</h3>
+            <div class="number" id="new-last-hour">0</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3>LinkedIn Jobs</h3>
+            <div class="number" id="linkedin-jobs">0</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3>Stepstone Jobs</h3>
+            <div class="number" id="stepstone-jobs">0</div>
+        </div>
+        
+        <div class="stat-card">
+            <h3>Glassdoor Jobs</h3>
+            <div class="number" id="glassdoor-jobs">0</div>
+        </div>
+    </div>
+    
+    <h2 style="margin: 30px 0 20px; color: #495057;">🆕 Jobs Posted in Last Hour</h2>
+    
+    <div class="stats-grid">
+        <div class="stat-card" style="background: linear-gradient(135deg, #0077b5 0%, #00a0dc 100%);">
+            <h3>LinkedIn</h3>
+            <div class="number" id="linkedin-last-hour">0</div>
+            <a href="/linkedin" style="color: white; text-decoration: underline; margin-top: 10px; display: inline-block;">View Jobs →</a>
+        </div>
+        
+        <div class="stat-card" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);">
+            <h3>Stepstone</h3>
+            <div class="number" id="stepstone-last-hour">0</div>
+            <a href="/stepstone" style="color: white; text-decoration: underline; margin-top: 10px; display: inline-block;">View Jobs →</a>
+        </div>
+        
+        <div class="stat-card" style="background: linear-gradient(135deg, #0caa41 0%, #0f9d58 100%);">
+            <h3>Glassdoor</h3>
+            <div class="number" id="glassdoor-last-hour">0</div>
+            <a href="/glassdoor" style="color: white; text-decoration: underline; margin-top: 10px; display: inline-block;">View Jobs →</a>
+        </div>
+    </div>
+    
+    <h2 style="margin: 30px 0 20px; color: #495057;">⏰ Last Scraper Runs</h2>
+    
+    <div id="scraper-status"></div>
+    
+    <div class="last-updated" id="last-updated"></div>
+</div>
+
+<script>
+async function loadStats() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('stats-container').style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/stats');
+        const data = await response.json();
+        
+        // Update statistics
+        document.getElementById('total-jobs').textContent = data.total_jobs || 0;
+        document.getElementById('new-last-hour').textContent = data.new_jobs_last_hour || 0;
+        document.getElementById('linkedin-jobs').textContent = data.linkedin_jobs || 0;
+        document.getElementById('stepstone-jobs').textContent = data.stepstone_jobs || 0;
+        document.getElementById('glassdoor-jobs').textContent = data.glassdoor_jobs || 0;
+        document.getElementById('linkedin-last-hour').textContent = data.linkedin_last_hour || 0;
+        document.getElementById('stepstone-last-hour').textContent = data.stepstone_last_hour || 0;
+        document.getElementById('glassdoor-last-hour').textContent = data.glassdoor_last_hour || 0;
+        
+        // Update scraper status
+        const scraperStatus = document.getElementById('scraper-status');
+        scraperStatus.innerHTML = '';
+        
+        for (const [source, run] of Object.entries(data.last_runs)) {
+            if (run) {
+                const card = document.createElement('div');
+                card.className = 'job-card';
+                
+                const statusColor = run.status === 'completed' ? '#28a745' : 
+                                  run.status === 'running' ? '#ffc107' : '#dc3545';
+                
+                const startTime = new Date(run.start_time).toLocaleString();
+                const endTime = run.end_time ? new Date(run.end_time).toLocaleString() : 'Running...';
+                
+                // Calculate time since last run
+                let timeSinceInfo = '';
+                if (run.end_time) {
+                    const endDate = new Date(run.end_time);
+                    const now = new Date();
+                    const minutesSince = (now - endDate) / 1000 / 60;
+                    const hoursSince = minutesSince / 60;
+                    
+                    if (hoursSince >= 1) {
+                        timeSinceInfo = `<p style="color: #28a745; font-weight: bold; margin-top: 10px;">
+                            ✅ Can run again (${hoursSince.toFixed(1)} hours since last run)
+                        </p>`;
+                    } else {
+                        const minutesRemaining = 60 - minutesSince;
+                        timeSinceInfo = `<p style="color: #ffc107; font-weight: bold; margin-top: 10px;">
+                            ⏰ Must wait ${minutesRemaining.toFixed(1)} more minutes (${minutesSince.toFixed(1)} minutes since last run)
+                        </p>`;
+                    }
+                }
+                
+                card.innerHTML = `
+                    <h3 style="color: ${statusColor};">${source.toUpperCase()}</h3>
+                    <div class="meta">
+                        <span class="badge badge-source">Status: ${run.status}</span>
+                        <span class="badge badge-new">Jobs Found: ${run.jobs_found || 0}</span>
+                        <span class="badge" style="background: #d4edda; color: #155724;">New Jobs: ${run.new_jobs || 0}</span>
+                    </div>
+                    <p style="color: #6c757d; margin-top: 10px;">
+                        <strong>Started:</strong> ${startTime}<br>
+                        <strong>Ended:</strong> ${endTime}
+                    </p>
+                    ${timeSinceInfo}
+                    ${run.error_message ? `<p style="color: #dc3545; margin-top: 10px;"><strong>Error:</strong> ${run.error_message}</p>` : ''}
+                `;
+                
+                scraperStatus.appendChild(card);
+            }
+        }
+        
+        // Update last updated time
+        const lastUpdated = new Date(data.last_updated).toLocaleString();
+        document.getElementById('last-updated').textContent = `Last updated: ${lastUpdated}`;
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('stats-container').style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error loading stats:', error);
+        document.getElementById('loading').innerHTML = `
+            <div style="color: #dc3545;">
+                <h3>Error loading statistics</h3>
+                <p>${error.message}</p>
+                <button class="refresh-btn" onclick="loadStats()">Try Again</button>
+            </div>
+        `;
+    }
+}
+
+// Load stats on page load
+loadStats();
+
+// Auto-refresh every 60 seconds
+setInterval(loadStats, 60000);
+</script>
+{% endblock %}

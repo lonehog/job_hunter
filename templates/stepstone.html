@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Stepstone Jobs - Job Hunter{% endblock %}
+
+{% block content %}
+<div id="loading" class="loading">
+    Loading Stepstone jobs...
+</div>
+
+<div id="jobs-container" style="display: none;">
+    <button class="refresh-btn" onclick="loadJobs()">🔄 Refresh Jobs</button>
+    
+    <h2 style="margin-bottom: 20px; color: #495057;">
+        🔧 Stepstone Jobs Posted in Last Hour
+        <span id="job-count" style="color: #ff6b6b; font-size: 0.8em;"></span>
+    </h2>
+    
+    <div id="jobs-list"></div>
+    
+    <div class="last-updated" id="last-updated"></div>
+</div>
+
+<script>
+async function loadJobs() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('jobs-container').style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/jobs/stepstone');
+        const data = await response.json();
+        
+        const jobsList = document.getElementById('jobs-list');
+        const jobCount = document.getElementById('job-count');
+        
+        jobCount.textContent = `(${data.count} jobs found)`;
+        
+        if (data.jobs && data.jobs.length > 0) {
+            jobsList.innerHTML = '';
+            
+            data.jobs.forEach(job => {
+                const card = document.createElement('div');
+                card.className = 'job-card';
+                
+                const firstSeen = new Date(job.first_seen).toLocaleString();
+                
+                card.innerHTML = `
+                    <h3>${job.job_title || 'No Title'}</h3>
+                    <div class="company">${job.company || 'Unknown Company'}</div>
+                    <div class="location">📍 ${job.location || 'Location not specified'}</div>
+                    
+                    <div class="meta">
+                        <span class="badge badge-source">Stepstone</span>
+                        ${job.is_new_in_last_hour ? '<span class="badge badge-new">🆕 New</span>' : ''}
+                        <span class="badge badge-date">Posted: ${job.posted_date || 'Recently'}</span>
+                        ${job.job_type ? `<span class="badge" style="background: #e7f3ff; color: #004085;">${job.job_type}</span>` : ''}
+                        ${job.salary ? `<span class="badge" style="background: #d4edda; color: #155724;">💰 ${job.salary}</span>` : ''}
+                    </div>
+                    
+                    ${job.description ? `
+                        <div class="description">
+                            ${job.description.substring(0, 300)}${job.description.length > 300 ? '...' : ''}
+                        </div>
+                    ` : ''}
+                    
+                    <div style="margin-top: 15px;">
+                        <small style="color: #6c757d;">First seen: ${firstSeen}</small>
+                    </div>
+                    
+                    <a href="${job.job_url}" target="_blank" rel="noopener noreferrer">View Job on Stepstone →</a>
+                `;
+                
+                jobsList.appendChild(card);
+            });
+        } else {
+            jobsList.innerHTML = `
+                <div class="no-jobs">
+                    <h3>😔 No jobs found</h3>
+                    <p>No Stepstone jobs were posted in the last hour.</p>
+                    <p style="margin-top: 10px;">Check back later or wait for the next scraper run.</p>
+                </div>
+            `;
+        }
+        
+        document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleString()}`;
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('jobs-container').style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error loading jobs:', error);
+        document.getElementById('loading').innerHTML = `
+            <div style="color: #dc3545;">
+                <h3>Error loading jobs</h3>
+                <p>${error.message}</p>
+                <button class="refresh-btn" onclick="loadJobs()">Try Again</button>
+            </div>
+        `;
+    }
+}
+
+// Load jobs on page load
+loadJobs();
+
+// Auto-refresh every 60 seconds
+setInterval(loadJobs, 60000);
+</script>
+{% endblock %}

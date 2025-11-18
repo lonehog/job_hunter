@@ -21,9 +21,15 @@ if __name__ == '__main__':
     scheduler_thread = threading.Thread(target=start_scheduler, daemon=True)
     scheduler_thread.start()
     
-    # Run initial scrape on startup (optional - comment out if you don't want this)
-    # Uncomment the line below to run scrapers immediately on startup
-    # run_initial_scrape()
+    # Run initial scrape on startup to populate database immediately
+    # This ensures the container has jobs right away instead of waiting for hourly schedule
+    print("\n" + "="*60)
+    print("🚀 Running initial scrape to populate database...")
+    print("="*60 + "\n")
+    
+    # Run initial scrape in background thread so it doesn't block app startup
+    initial_scrape_thread = threading.Thread(target=run_initial_scrape, daemon=True)
+    initial_scrape_thread.start()
     
     print("\n" + "="*60)
     print("🚀 Application is starting...")

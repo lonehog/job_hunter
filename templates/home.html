@@ -8,7 +8,10 @@
 </div>
 
 <div id="stats-container" style="display: none;">
-    <button class="refresh-btn" onclick="loadStats()">🔄 Refresh Stats</button>
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <button class="refresh-btn" onclick="loadStats()">🔄 Refresh Stats</button>
+        <button class="refresh-btn" onclick="triggerScrapers()" id="search-now-btn">🔍 Search for jobs now</button>
+    </div>
     
     <h2 style="margin-bottom: 20px; color: #495057;">📊 Overview</h2>
     
@@ -157,6 +160,51 @@ async function loadStats() {
                 <button class="refresh-btn" onclick="loadStats()">Try Again</button>
             </div>
         `;
+    }
+}
+
+async function triggerScrapers() {
+    const btn = document.getElementById('search-now-btn');
+    const originalText = btn.textContent;
+    
+    // Disable button and show loading state
+    btn.disabled = true;
+    btn.textContent = '⏳ Checking timing...';
+    
+    try {
+        // First check if scrapers can run
+        const canRunResponse = await fetch('/api/scraper/can-run');
+        const canRunData = await canRunResponse.json();
+        
+        if (!canRunData.all.can_run) {
+            alert(`⏰ Please wait ${canRunData.all.time_until_next_run_minutes.toFixed(1)} more minutes before running scrapers again.\n\nScrapers must wait 1 hour between runs to avoid rate limiting.`);
+            btn.disabled = false;
+            btn.textContent = originalText;
+            return;
+        }
+        
+        // Trigger all scrapers
+        btn.textContent = '🚀 Starting scrapers...';
+        const response = await fetch('/api/scraper/trigger/all');
+        const data = await response.json();
+        
+        if (response.status === 429) {
+            // Too soon to run
+            alert(`⏰ ${data.reason}\n\nPlease wait ${data.time_since_last_minutes ? (60 - data.time_since_last_minutes).toFixed(1) : '...'} more minutes.`);
+        } else if (response.ok) {
+            alert('✅ Scrapers started! They will run in the background.\n\nRefresh the page in a few minutes to see new jobs.');
+            // Reload stats after a short delay
+            setTimeout(() => loadStats(), 2000);
+        } else {
+            alert(`❌ Error: ${data.error || data.message}`);
+        }
+        
+    } catch (error) {
+        console.error('Error triggering scrapers:', error);
+        alert(`❌ Error triggering scrapers: ${error.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
     }
 }
 

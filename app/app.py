@@ -13,9 +13,21 @@ app = Flask(__name__,
 CORS(app)
 
 # Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///jobs.db'
+# Use absolute path for database to ensure it's in a predictable location
+DB_PATH = os.environ.get('DATABASE_PATH')
+if not DB_PATH:
+    # Default to /app/data/jobs.db in container, or local path if running locally
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    DB_PATH = os.path.join(data_dir, 'jobs.db')
+
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'your-secret-key-here'
+
+print(f"\n{'='*60}")
+print(f"📁 Database location: {DB_PATH}")
+print(f"{'='*60}\n")
 
 # Initialize database
 db.init_app(app)
@@ -250,7 +262,7 @@ def trigger_scraper(source):
         if source not in ['linkedin', 'stepstone', 'glassdoor', 'all']:
             return jsonify({'error': 'Invalid source'}), 400
         
-        from scheduler import run_scraper_task, run_all_scrapers, check_last_run_time
+        from app.scheduler import run_scraper_task, run_all_scrapers, check_last_run_time
         
         # Check timing before running
         if source == 'all':
